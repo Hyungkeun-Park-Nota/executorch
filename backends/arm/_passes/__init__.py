@@ -153,6 +153,7 @@ from .rewrite_slice import RewriteSlicePass  # noqa
 from .rewrite_upsample import RewriteUpsamplePass  # noqa
 from .scalars_to_attribute_pass import ScalarsToAttributePass  # noqa
 from .size_adjust_input_pass import SizeAdjustInputPass  # noqa
+from .to_device_pass import ToDevicePass  # noqa
 from .to_tosa_memory_format_pass import ToTosaMemoryFormatPass  # noqa
 from .unsqueeze_before_repeat_pass import UnsqueezeBeforeRepeatPass  # noqa
 from .unsqueeze_scalar_placeholders_pass import UnsqueezeScalarPlaceholdersPass  # noqa
