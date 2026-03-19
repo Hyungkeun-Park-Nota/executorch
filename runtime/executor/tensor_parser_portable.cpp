@@ -51,12 +51,13 @@ Result<Tensor> parseTensor(
 
   TensorShapeDynamism dynamism =
       static_cast<TensorShapeDynamism>(s_tensor->shape_dynamism());
-  // TODO(T175194371): Remove this check once fully dynamic shapes are
-  // supported.
-  ET_CHECK_OR_RETURN_ERROR(
-      dynamism != TensorShapeDynamism::DYNAMIC_UNBOUND,
-      NotSupported,
-      "Fully dynamic tensor shapes not yet supported: T175194371");
+  if (dynamism == TensorShapeDynamism::DYNAMIC_UNBOUND) {
+    ET_CHECK_OR_RETURN_ERROR(
+        memory_manager->dynamic_allocator() != nullptr,
+        NotSupported,
+        "Model contains DYNAMIC_UNBOUND tensors but no DynamicAllocator was "
+        "provided. Pass a DynamicAllocator to MemoryManager.");
+  }
 
   ET_CHECK_OR_RETURN_ERROR(
       s_tensor->sizes() != nullptr, InvalidProgram, "Missing sizes field");
@@ -179,6 +180,32 @@ Result<Tensor> parseTensor(
     return data_ptr.error();
   }
   tensor_impl->set_data(data_ptr.get());
+
+  // For DYNAMIC_UNBOUND tensors, wire up the dynamic allocator. Memory is
+  // managed by the DynamicAllocator rather than the memory planner, making it
+  // freeable via FreeCall and growable via resize.
+  if (dynamism == TensorShapeDynamism::DYNAMIC_UNBOUND) {
+    auto* dyn_alloc = memory_manager->dynamic_allocator();
+    tensor_impl->set_dynamic_allocator(dyn_alloc);
+    if (data_ptr.get() == nullptr && tensor_impl->nbytes() > 0) {
+      // No memory-planned data (KV cache case: data_buffer_idx=0,
+      // allocation_info=null). Allocate from DynamicAllocator now.
+      size_t actual_size = 0;
+      void* dyn_data = dyn_alloc->allocate(
+          tensor_impl->nbytes(), alignof(std::max_align_t), &actual_size);
+      ET_CHECK_OR_RETURN_ERROR(
+          dyn_data != nullptr,
+          MemoryAllocationFailed,
+          "Failed to allocate %" PRIu64
+          " bytes for DYNAMIC_UNBOUND tensor",
+          static_cast<uint64_t>(tensor_impl->nbytes()));
+      tensor_impl->set_data(dyn_data);
+      tensor_impl->set_capacity_bytes(actual_size);
+    } else {
+      tensor_impl->set_capacity_bytes(
+          data_ptr.get() != nullptr ? tensor_impl->nbytes() : 0);
+    }
+  }
 
   return Tensor(tensor_impl);
 }
