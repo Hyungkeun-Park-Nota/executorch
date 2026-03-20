@@ -33,6 +33,29 @@ import torch as _torch
 
 logger = logging.getLogger(__name__)
 
+# Auto-discover the OpenVINO C library path from the pip-installed openvino
+# package so the C++ backend's dlopen("libopenvino_c.so") works without the
+# user having to set LD_LIBRARY_PATH or OPENVINO_LIB_PATH manually.
+if not os.environ.get("OPENVINO_LIB_PATH"):
+    try:
+        import importlib.util
+
+        spec = importlib.util.find_spec("openvino")
+        if spec is not None and spec.submodule_search_locations:
+            _ov_dir = spec.submodule_search_locations[0]
+            _ov_lib = os.path.join(_ov_dir, "libs", "libopenvino_c.so")
+            if os.path.exists(_ov_lib):
+                os.environ["OPENVINO_LIB_PATH"] = _ov_lib
+            else:
+                logger.warning(
+                    "OpenVINO package found but libopenvino_c.so not at %s; "
+                    "set OPENVINO_LIB_PATH manually if needed",
+                    _ov_lib,
+                )
+            del _ov_lib, _ov_dir, spec
+    except Exception as e:
+        logger.debug("OpenVINO auto-discovery failed: %s", e)
+
 # Update the DLL search path on Windows. This is the recommended way to handle native
 # extensions.
 if sys.platform == "win32":

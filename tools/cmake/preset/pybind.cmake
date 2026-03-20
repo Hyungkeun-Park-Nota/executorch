@@ -39,6 +39,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|i.86)$")
     set_overridable_option(EXECUTORCH_BUILD_QNN OFF)
   endif()
+  set_overridable_option(EXECUTORCH_BUILD_OPENVINO OFF)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL
                                                "WIN32"
 )
